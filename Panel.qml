@@ -336,11 +336,12 @@ Panel {
         Column {
           id: panelColumn
           width: scrollArea.availableWidth
-          spacing: Style.space(14)
+          spacing: Style.space(6)
 
           PanelHero {
             width: parent.width
             title: "Keyboard"
+            iconSize: Style.font.title
             meta: Model.heroMeta({
               available: root.available,
               enabled: root.enabled,
@@ -385,28 +386,26 @@ Panel {
             font.pixelSize: Style.font.caption
           }
 
-          PanelSeparator { foreground: root.bar.foreground }
-
-          Toggle {
+          Row {
             width: parent.width
-            label: "Backlight"
-            description: "Turn the keyboard and light bar off without forgetting the color."
-            foreground: root.bar.foreground
-            accent: Color.accent
-            fontFamily: root.bar.fontFamily
-            checked: root.enabled
-            hasCursor: root.cursorActive && root.focusSection === "power"
-            onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(this)
-            onHovered: function(h) {
-              if (!h) return
-              root.cursorActive = true
-              root.focusSection = "power"
-              root.selectedIndex = 0
-            }
-            onClicked: root.setEnabled(!root.enabled)
-          }
+            spacing: Style.space(8)
 
-          PanelSeparator { foreground: root.bar.foreground }
+            CompactToggle {
+              width: (parent.width - parent.spacing) / 2
+              label: "Backlight"
+              sectionId: "power"
+              checked: root.enabled
+              onClicked: root.setEnabled(!root.enabled)
+            }
+
+            CompactToggle {
+              width: (parent.width - parent.spacing) / 2
+              label: "One color"
+              sectionId: "link"
+              checked: root.linked
+              onClicked: root.setLinked(!root.linked)
+            }
+          }
 
           SliderSection {
             id: brightnessSection
@@ -422,27 +421,6 @@ Panel {
             onReleased: function(v) { root.commitBrightness(v) }
           }
 
-          PanelSeparator { foreground: root.bar.foreground }
-
-          Toggle {
-            width: parent.width
-            label: "Same color everywhere"
-            description: "Left, center, right, and the front light bar share one color."
-            foreground: root.bar.foreground
-            accent: Color.accent
-            fontFamily: root.bar.fontFamily
-            checked: root.linked
-            hasCursor: root.cursorActive && root.focusSection === "link"
-            onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(this)
-            onHovered: function(h) {
-              if (!h) return
-              root.cursorActive = true
-              root.focusSection = "link"
-              root.selectedIndex = 0
-            }
-            onClicked: root.setLinked(!root.linked)
-          }
-
           ChoiceSection {
             visible: !root.linked
             width: parent.width
@@ -453,12 +431,10 @@ Panel {
             onActivated: function(v) { root.setActiveZone(v) }
           }
 
-          PanelSeparator { foreground: root.bar.foreground }
-
           Column {
             id: colorSection
             width: parent.width
-            spacing: Style.space(10)
+            spacing: Style.space(4)
 
             PanelSectionHeader {
               text: "COLOR"
@@ -469,7 +445,7 @@ Panel {
             Grid {
               id: swatchGrid
               width: parent.width
-              columns: 5
+              columns: 10
               spacing: Style.spacing.xs
               readonly property real cell: columns > 0 ? (width - spacing * (columns - 1)) / columns : 0
 
@@ -481,7 +457,7 @@ Panel {
                   required property var modelData
                   required property int index
                   width: swatchGrid.cell
-                  height: swatchGrid.cell
+                  height: Style.space(22)
                   radius: Math.min(Style.cornerRadius, width / 2)
                   color: Qt.rgba(modelData.rgb[0] / 255, modelData.rgb[1] / 255, modelData.rgb[2] / 255, 1)
                   border.width: Model.sameRgb(root.previewRgb, modelData.rgb) ? Math.max(2, Style.space(2)) : 0
@@ -543,8 +519,6 @@ Panel {
             }
           }
 
-          PanelSeparator { foreground: root.bar.foreground }
-
           ChoiceSection {
             width: parent.width
             sectionId: "effect"
@@ -554,7 +528,6 @@ Panel {
             onActivated: function(v) { root.setMode(v) }
           }
 
-          Item { width: parent.width; height: Style.space(4) }
         }
       }
     }
@@ -567,7 +540,7 @@ Panel {
       text: root.iconGlyph
       color: root.enabled && root.available ? root.previewColor : root.bar.foreground
       font.family: root.bar.fontFamily
-      font.pixelSize: Style.font.display
+      font.pixelSize: Style.font.title
     }
   }
 
@@ -585,7 +558,7 @@ Panel {
     signal moved(real value)
     signal released(real value)
 
-    spacing: Style.space(6)
+    spacing: Style.space(2)
 
     Item {
       width: parent.width
@@ -617,7 +590,7 @@ Panel {
     CursorSurface {
       id: sliderRow
       width: parent.width
-      height: slider.implicitHeight + Style.spacing.controlGap
+      height: slider.implicitHeight
       hasCursor: root.cursorActive && root.focusSection === sliderSection.sectionId && root.selectedIndex === -1
       onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(sliderRow)
       foreground: root.bar.foreground
@@ -656,7 +629,7 @@ Panel {
     required property string value
     signal activated(string value)
 
-    spacing: Style.space(10)
+    spacing: Style.space(4)
 
     PanelSectionHeader {
       text: choiceSection.title
@@ -685,7 +658,7 @@ Panel {
           foreground: root.bar.foreground
           fontFamily: root.bar.fontFamily
           horizontalPadding: Style.spacing.sm
-          verticalPadding: Style.spacing.controlPaddingY
+          verticalPadding: Style.space(3)
           bordered: true
           selected: choiceSection.value === modelData.value
           hasCursor: root.cursorActive && root.focusSection === choiceSection.sectionId && root.selectedIndex === index
@@ -698,6 +671,63 @@ Panel {
           }
         }
       }
+    }
+  }
+
+  component CompactToggle: BorderSurface {
+    id: toggleRow
+    required property string label
+    required property string sectionId
+    property bool checked: false
+    signal clicked()
+
+    implicitHeight: Style.space(32)
+    radius: Style.cornerRadius
+    color: "transparent"
+    borderSpec: Border.controlSpec(
+      (root.cursorActive && root.focusSection === sectionId) || mouse.containsMouse ? "hover-cursor" : "normal",
+      root.bar.foreground, Color.accent)
+
+    Row {
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(8)
+      anchors.rightMargin: Style.space(4)
+      spacing: Style.space(6)
+
+      Text {
+        textFormat: Text.PlainText
+        text: toggleRow.label
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        elide: Text.ElideRight
+        width: parent.width - switchControl.implicitWidth - parent.spacing
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      ToggleSwitch {
+        id: switchControl
+        checked: toggleRow.checked
+        interactive: false
+        trackHeight: Style.space(16)
+        foreground: root.bar.foreground
+        accent: Color.accent
+        anchors.verticalCenter: parent.verticalCenter
+      }
+    }
+
+    MouseArea {
+      id: mouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onEntered: {
+        root.cursorActive = true
+        root.focusSection = toggleRow.sectionId
+        root.selectedIndex = 0
+      }
+      onClicked: toggleRow.clicked()
     }
   }
 }
