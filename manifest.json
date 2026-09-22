@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.wouldja.keyboard",
+  "name": "Keyboard",
+  "version": "1.0.0",
+  "author": "Brian Ehlers",
+  "description": "Keyboard backlight color, brightness, and effects for the Sager P870DM-G",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Keyboard",
+    "description": "Keyboard backlight color, brightness, and effects",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
