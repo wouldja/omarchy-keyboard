@@ -348,7 +348,7 @@ Panel {
               brightness: brightnessSection.dragging ? brightnessSection.liveValue : root.brightness,
               mode: root.mode
             })
-            detail: root.loaded && !root.available ? "No driver" : ""
+            detail: "1.2.0"
             foreground: root.bar.foreground
             fontFamily: root.bar.fontFamily
             iconComponent: heroIcon
