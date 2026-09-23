@@ -4,6 +4,8 @@ Bar widget for the keyboard backlight on a Sager / Clevo P870DM-G.
 
 The keyboard has three lighting zones plus the light bar along the front edge. Click the keyboard icon to set the color, brightness, and firmware effect. Scroll the icon to change brightness. Right-click it to turn the lights off.
 
+![Keyboard panel](preview.png)
+
 ## Install
 
 ```sh
