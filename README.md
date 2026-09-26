@@ -18,7 +18,7 @@ The lights are not a USB device. The panel talks to a small kernel module, `sage
 pkexec ~/.config/omarchy/plugins/io.github.wouldja.keyboard/driver/install.sh
 ```
 
-That script needs root. It builds the module with DKMS, loads it, and adds it to `/etc/modules-load.d/sager_kbd.conf` so it comes back after a reboot. It does not edit Hyprland or Omarchy config. DKMS and the headers for the running kernel (`linux-omarchy-headers` on Omarchy) have to be installed first.
+That script needs root and must be launched with `pkexec` from the desktop account that should control the device. It builds the module with DKMS, loads it, and adds it to `/etc/modules-load.d/sager_kbd.conf` so it comes back after a reboot. It records that account's UID in `/etc/modprobe.d/omarchy-sager-kbd.conf`; the sysfs controls are writable only by that account, never by every local user. The installer refuses to replace an existing unmanaged modprobe config. It does not edit Hyprland or Omarchy config. DKMS and the headers for the running kernel (`linux-omarchy-headers` on Omarchy) have to be installed first.
 
 The widget lands on the right of the bar. If it does not appear immediately:
 
@@ -37,9 +37,10 @@ omarchy plugin remove io.github.wouldja.keyboard
 That drops the widget and leaves `~/.config/sager-keyboard/` in place. The driver stays installed until:
 
 ```sh
-sudo dkms remove -m sager-kbd -v 1.1.0 --all
+sudo dkms remove -m sager-kbd -v 1.2.0 --all
 sudo rmmod sager_kbd
 sudo rm /etc/modules-load.d/sager_kbd.conf
+sudo rm /etc/modprobe.d/omarchy-sager-kbd.conf
 ```
 
 The Fans plugin uses the same module. Remove the module only when both plugins are gone.

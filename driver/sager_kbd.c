@@ -17,6 +17,8 @@
 #include <linux/string.h>
 #include <linux/sysfs.h>
 #include <linux/suspend.h>
+#include <linux/uidgid.h>
+#include <linux/user_namespace.h>
 #include <linux/wmi.h>
 
 #define SAGER_WMI_GUID "ABBC0F6D-8EA1-11D1-00A0-C90629100000"
@@ -90,6 +92,9 @@ static struct sager_state {
 
 static struct platform_device *sager_pdev;
 static struct notifier_block sager_pm_nb;
+static int session_uid = -1;
+module_param(session_uid, int, 0444);
+MODULE_PARM_DESC(session_uid, "UID allowed to control the keyboard and fans");
 
 static const u32 sager_zone_code[] = {
 	SAGER_ZONE_LEFT,
@@ -855,23 +860,33 @@ static const struct attribute_group sager_group = {
 	.attrs = sager_attrs,
 };
 
-/* The desktop session writes these files. Sysfs rejects a world-writable
- * mode at compile time, so the files are created root-only and opened here.
- */
-static void sager_relax_permissions(void)
+/* Give write access only to the desktop user selected by the installer. */
+static void sager_assign_session_ownership(void)
 {
 	static const char *names[] = {
 		"left", "center", "right", "lightbar",
 		"brightness", "enabled", "mode", "apply",
 		"fan_mode", "fan_duty", "fan_curve",
 	};
+	kuid_t uid;
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(names); i++) {
-		struct attribute attr = { .name = names[i] };
+	if (session_uid < 0) {
+		pr_warn("no session UID configured; sysfs controls remain root-owned\n");
+		return;
+	}
+	uid = make_kuid(&init_user_ns, session_uid);
+	if (!uid_valid(uid)) {
+		pr_warn("invalid session UID %d; sysfs controls remain root-owned\n",
+			session_uid);
+		return;
+	}
 
-		if (sysfs_chmod_file(&sager_pdev->dev.kobj, &attr, 0666))
-			pr_warn("could not open %s for the session\n", names[i]);
+	for (i = 0; i < ARRAY_SIZE(names); i++) {
+		if (sysfs_file_change_owner(&sager_pdev->dev.kobj, names[i], uid,
+					    GLOBAL_ROOT_GID))
+			pr_warn("could not assign %s to session UID %d\n",
+				names[i], session_uid);
 	}
 }
 
@@ -906,7 +921,7 @@ static int sager_probe(struct wmi_device *wdev, const void *context)
 		sager_pdev = NULL;
 		return err;
 	}
-	sager_relax_permissions();
+	sager_assign_session_ownership();
 
 	sager_pm_nb.notifier_call = sager_pm_notify;
 	register_pm_notifier(&sager_pm_nb);
