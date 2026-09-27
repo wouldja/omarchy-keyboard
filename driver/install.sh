@@ -91,6 +91,27 @@ classify_tree() {
   printf 'foreign\n'
 }
 
+# absent: the modprobe file is not there yet.
+# ours: exactly the marker line and one session_uid option, nothing else.
+# foreign: any other contents, including a local edit of a file that still has the marker.
+modprobe_conf_state() {
+  local body
+  if [[ ! -e "$modprobe_conf" ]]; then
+    printf 'absent\n'
+    return 0
+  fi
+  if [[ ! -f "$modprobe_conf" ]]; then
+    printf 'foreign\n'
+    return 0
+  fi
+  body="$(cat "$modprobe_conf" 2>/dev/null || true)"
+  if [[ "$body" =~ ^'# Managed by omarchy-keyboard'$'\n''options sager_kbd session_uid='[0-9]+$'\n'?$ ]]; then
+    printf 'ours\n'
+    return 0
+  fi
+  printf 'foreign\n'
+}
+
 # none: DKMS has no registration for this version.
 # at-tree: the registration's source symlink is this version's /usr/src tree.
 # elsewhere: registered, but the source is not that tree.
@@ -187,10 +208,13 @@ main() {
     exit 1
   fi
 
-  if [[ -e "$modprobe_conf" ]] && ! grep -q '^# Managed by omarchy-keyboard$' "$modprobe_conf"; then
-    echo "$modprobe_conf already exists and is not managed by omarchy-keyboard; refusing to overwrite it" >&2
-    exit 1
-  fi
+  case "$(modprobe_conf_state)" in
+    absent|ours) ;;
+    *)
+      echo "$modprobe_conf is not an unmodified omarchy-keyboard config; leaving it in place" >&2
+      exit 1
+      ;;
+  esac
   if [[ -e "$modules_conf" ]] && [[ "$(cat "$modules_conf")" != "sager_kbd" ]]; then
     echo "$modules_conf already contains other content; refusing to overwrite it" >&2
     exit 1
