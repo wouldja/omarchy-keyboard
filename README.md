@@ -20,6 +20,8 @@ pkexec ~/.config/omarchy/plugins/io.github.wouldja.keyboard/driver/install.sh
 
 That script needs root and must be launched with `pkexec` from the desktop account that should control the device. It builds the module with DKMS, loads it, and adds it to `/etc/modules-load.d/sager_kbd.conf` so it comes back after a reboot. It records that account's UID in `/etc/modprobe.d/omarchy-sager-kbd.conf`; the sysfs controls are writable only by that account, never by every local user. The installer refuses to replace an existing unmanaged modprobe config. It does not edit Hyprland or Omarchy config. DKMS and the headers for the running kernel (`linux-omarchy-headers` on Omarchy) have to be installed first.
 
+The module source is installed at `/usr/src/sager-kbd-1.2.0`. The script writes that directory, and removes a `sager-kbd` 1.0.0, 1.1.0, or 1.2.0 DKMS registration, only when the source tree is missing or is an unmodified copy shipped by this plugin. A marker file, `OMARCHY-KEYBOARD`, records the checksums of the installed sources. If the tree belongs to another driver or was edited after install, the script stops before copying files or running `dkms remove`, and leaves the existing driver in place.
+
 The widget lands on the right of the bar. If it does not appear immediately:
 
 ```sh
