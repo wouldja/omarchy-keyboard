@@ -96,6 +96,11 @@ classify_tree() {
 # foreign: any other contents, including a local edit of a file that still has the marker.
 modprobe_conf_state() {
   local body
+  # -e is false for a dangling symlink, and a later redirect would follow it.
+  if [[ -L "$modprobe_conf" ]]; then
+    printf 'symlink\n'
+    return 0
+  fi
   if [[ ! -e "$modprobe_conf" ]]; then
     printf 'absent\n'
     return 0
@@ -110,6 +115,78 @@ modprobe_conf_state() {
     return 0
   fi
   printf 'foreign\n'
+}
+
+# absent: no modules-load file yet.
+# ours: a regular file whose only contents are "sager_kbd".
+# symlink: including a dangling link. Never treat that as absent.
+modules_conf_state() {
+  local body
+  if [[ -L "$modules_conf" ]]; then
+    printf 'symlink\n'
+    return 0
+  fi
+  if [[ ! -e "$modules_conf" ]]; then
+    printf 'absent\n'
+    return 0
+  fi
+  if [[ ! -f "$modules_conf" ]]; then
+    printf 'foreign\n'
+    return 0
+  fi
+  body="$(cat "$modules_conf")"
+  if [[ "$body" == "sager_kbd" || "$body" == $'sager_kbd\n' ]]; then
+    printf 'ours\n'
+    return 0
+  fi
+  printf 'foreign\n'
+}
+
+install_modules_conf() {
+  local state tmp
+  state="$(modules_conf_state)"
+  case "$state" in
+    ours) return 0 ;;
+    absent) ;;
+    *)
+      echo "$modules_conf is not a regular omarchy-keyboard modules-load file; leaving it in place" >&2
+      return 1
+      ;;
+  esac
+  tmp="$(mktemp "${modules_conf}.tmp.XXXXXX")"
+  printf 'sager_kbd\n' >"$tmp"
+  chmod 0644 "$tmp"
+  if [[ -L "$modules_conf" || -e "$modules_conf" ]]; then
+    rm -f "$tmp"
+    echo "$modules_conf changed during install; leaving it in place" >&2
+    return 1
+  fi
+  if ! mv -n "$tmp" "$modules_conf"; then
+    rm -f "$tmp"
+    echo "$modules_conf could not be created; leaving it in place" >&2
+    return 1
+  fi
+}
+
+install_modprobe_conf() {
+  local state tmp
+  state="$(modprobe_conf_state)"
+  case "$state" in
+    absent|ours) ;;
+    *)
+      echo "$modprobe_conf is not an unmodified omarchy-keyboard config; leaving it in place" >&2
+      return 1
+      ;;
+  esac
+  tmp="$(mktemp "${modprobe_conf}.tmp.XXXXXX")"
+  printf '# Managed by omarchy-keyboard\noptions sager_kbd session_uid=%s\n' "$session_uid" >"$tmp"
+  chmod 0644 "$tmp"
+  if [[ -L "$modprobe_conf" ]]; then
+    rm -f "$tmp"
+    echo "$modprobe_conf is a symlink; leaving it in place" >&2
+    return 1
+  fi
+  mv "$tmp" "$modprobe_conf"
 }
 
 # none: DKMS has no registration for this version.
@@ -215,10 +292,13 @@ main() {
       exit 1
       ;;
   esac
-  if [[ -e "$modules_conf" ]] && [[ "$(cat "$modules_conf")" != "sager_kbd" ]]; then
-    echo "$modules_conf already contains other content; refusing to overwrite it" >&2
-    exit 1
-  fi
+  case "$(modules_conf_state)" in
+    absent|ours) ;;
+    *)
+      echo "$modules_conf is not a regular omarchy-keyboard modules-load file; leaving it in place" >&2
+      exit 1
+      ;;
+  esac
 
   ensure_safe
 
@@ -229,17 +309,8 @@ main() {
   dkms add -m sager-kbd -v "$ver"
   dkms install -m sager-kbd -v "$ver"
 
-  if [[ ! -e "$modules_conf" ]]; then
-    printf 'sager_kbd\n' >"$modules_conf"
-    chmod 0644 "$modules_conf"
-  fi
-  local tmp_conf
-  tmp_conf="$(mktemp "${modprobe_conf}.tmp.XXXXXX")"
-  # shellcheck disable=SC2064
-  trap "rm -f '$tmp_conf'" EXIT
-  printf '# Managed by omarchy-keyboard\noptions sager_kbd session_uid=%s\n' "$session_uid" >"$tmp_conf"
-  chmod 0644 "$tmp_conf"
-  mv "$tmp_conf" "$modprobe_conf"
+  install_modules_conf
+  install_modprobe_conf
 
   if lsmod | grep -q '^sager_kbd '; then
     rmmod sager_kbd
